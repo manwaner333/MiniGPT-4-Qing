@@ -5,10 +5,10 @@ import json
 
 if __name__ == "__main__":
 
-    new_file_name = "data/synthetic_data_from_M_HalDetect.json"
+    new_file_name = "data/synthetic_train_data_from_M_HalDetect.json"
     new_file = open(new_file_name, "w")
     images = []
-    ori_file_name = 'data/val_raw.json'
+    ori_file_name = 'data/train_raw.json'
     with open(ori_file_name, 'r') as f:
         for file in f.readlines():
             dic = json.loads(file)

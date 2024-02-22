@@ -2,7 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
-models
+
+models/*
 Qing/data
 Qing/models
 eval_configs/minigptv2_checkpoint.pth
