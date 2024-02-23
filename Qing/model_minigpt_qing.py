@@ -1,11 +1,13 @@
 import argparse
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from minigpt4.common.config import Config
 from minigpt4.common.dist_utils import get_rank
 from minigpt4.common.registry import registry
 from minigpt4.conversation.conversation_qing import Chat, CONV_VISION_minigptv2
 import numpy as np
 import json
-import os
 import math
 from tqdm import tqdm
 import pickle
@@ -47,13 +49,13 @@ def main(args):
     count = 0
     for line in tqdm(questions):
 
-        if count == 5:
-            break
+        # if count == 195:
+        #     break
 
         idx = line["question_id"]
 
-        # if idx not in idxs:
-        #     break
+        # if idx != 194:  # 194
+        #     continue
 
         # Set Chat
         chat_state = CONV_VISION_minigptv2.copy()
@@ -66,9 +68,12 @@ def main(args):
         question = line['question']
         response = line['response']
         sentences = line['sentences']
+        labels = line['labels']
         user_message = question + "<QuestoRes>" + response
         chat.ask(user_message, chat_state)
         chat.encode_img(img_list)
+        # print("chat_state")
+        # print(chat_state)
 
         # get answer
         # logprobs = chat.answer(conv=chat_state,
@@ -88,13 +93,16 @@ def main(args):
 
         logprobs = chat.answer(conv=chat_state,
                                img_list=img_list,
+                               sentences=sentences,
                                output_hidden_states=True)
 
         output = {"question_id": idx,
+                  "image_file": image_file,
                   "prompts": question,
                   "text": response,
                   "sentences": sentences,
-                  "logprobs": logprobs
+                  "logprobs": logprobs,
+                  "labels": labels
                   }
 
         responses[idx] = output
@@ -116,8 +124,8 @@ if __name__ == "__main__":
     parser.add_argument("--top_p", type=float, default=None)
     parser.add_argument("--top_k", type=int, default=None)
     parser.add_argument("--image-folder", type=str, default="data/val2014")
-    parser.add_argument("--question-file", type=str, default="data/synthetic_data_from_M_HalDetect.json")
-    parser.add_argument("--answers-file", type=str, default="data/answer_synthetic_data_from_M_HalDetect.bin")
+    parser.add_argument("--question-file", type=str, default="data/synthetic_train_data_from_M_HalDetect.json")
+    parser.add_argument("--answers-file", type=str, default="data/answer_synthetic_train_data_from_M_HalDetect.bin")
     parser.add_argument("--num-chunks", type=int, default=1)
     parser.add_argument("--chunk-idx", type=int, default=0)
     parser.add_argument("--options", nargs="+", help="override some settings in the used config, the key-value pair " "in xxx=yyy format will be merged into config file (deprecate), " "change to --cfg-options instead.",)

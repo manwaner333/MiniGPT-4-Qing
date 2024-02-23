@@ -9,6 +9,7 @@ if __name__ == "__main__":
     new_file = open(new_file_name, "w")
     images = []
     ori_file_name = 'data/train_raw.json'
+    idx = 0
     with open(ori_file_name, 'r') as f:
         for file in f.readlines():
             dic = json.loads(file)
@@ -16,7 +17,8 @@ if __name__ == "__main__":
                 text = line['question'].strip().replace("<image>", "").replace("\n", "")
                 response = line['response'].strip()
                 image = line['image'].strip()
-                question_id = line['image'].split(".")[0]
+                # question_id = line['image'].split(".")[0]
+                question_id = idx
                 sentences = []
                 labels = []
                 for ele in line['annotations']:
@@ -33,7 +35,7 @@ if __name__ == "__main__":
                     "sentences": sentences,
                     "labels": labels,
                 }) + "\n")
-
+                idx += 1
                 new_file.flush()
 
     new_file.close()

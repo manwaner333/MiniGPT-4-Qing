@@ -175,7 +175,7 @@ class Chat:
         return generation_kwargs, seg_tokens
 
 
-    def answer(self, conv, img_list, **kargs):
+    def answer(self, conv, img_list, sentences,  **kargs):
         generation_dict, seg_tokens = self.answer_prepare(conv, img_list, **kargs)
         img_len = img_list[0].shape[1]
         seg_tokens_1_len = seg_tokens[0].shape[1]
@@ -232,18 +232,95 @@ class Chat:
             tokens.append(gen_tok)
             token_logprobs.append(lp)
             token_entropies.append(entro)
-            token_and_logprobs.append([gen_tok, lp, entropy])
+            token_and_logprobs.append([gen_tok, lp, entro])
             tokens_idx.append(gen_tok_id.detach().cpu().numpy().tolist())
+
+        # 提取每个句子最后一个token的hidden state
+        combined_hidden_states = {}
+        combined_token_logprobs = {}
+        combined_token_entropies = {}
+        ques_hidden_states = hidden_states[ques_end_idx:ques_end_idx + 1, :]
+        combined_hidden_states["ques"] = ques_hidden_states.detach().cpu().numpy().tolist()
+
+        sentences_end = []
+        sentences_end.append(ques_end_idx)
+        start_idx = res_start_idx
+        record = []
+        for sent_i, sentence in enumerate(sentences):
+            # sentence exist in the passage, so we need to find where it is [i1, i2]
+            sentence_tf = "".join(sentence.split(" "))
+            xarr = [i for i in range(len(tokens))]
+            for i1 in xarr:
+                mystring = "".join(tokens[i1:])
+                if sentence_tf not in mystring:
+                    break
+            i1 = i1 - 1
+            for i2 in xarr[::-1]:
+                mystring = "".join(tokens[i1:i2 + 1])
+                if sentence_tf not in mystring:
+                    break
+            i2 = i2 + 1
+
+            sentence_len = i2 - i1 + 1
+            sentence_end = start_idx + sentence_len - 1
+            hidden_state = hidden_states[sentence_end:sentence_end+1, :]
+            combined_hidden_states[sent_i] = hidden_state.detach().cpu().numpy().tolist()
+            combined_token_logprobs[sent_i] = token_logprobs[i1:i2+1]
+            combined_token_entropies[sent_i] = token_entropies[i1:i2+1]
+            sentences_end.append(sentence_end)
+            record.append([i1, i2])
+            start_idx = sentence_end + 1
+
+        # 提取每个句子每一个token的hidden state
+        # combined_hidden_states = {}
+        # combined_token_logprobs = {}
+        # combined_token_entropies = {}
+        # ques_hidden_states = hidden_states[ques_start_idx:ques_end_idx + 1, :]
+        # combined_hidden_states["ques"] = ques_hidden_states.detach().cpu().numpy().tolist()
+        #
+        # sentences_end = []
+        # sentences_end.append(ques_end_idx)
+        # start_idx = res_start_idx
+        # record = []
+        # for sent_i, sentence in enumerate(sentences):
+        #     # sentence exist in the passage, so we need to find where it is [i1, i2]
+        #     sentence_tf = "".join(sentence.split(" "))
+        #     xarr = [i for i in range(len(tokens))]
+        #     for i1 in xarr:
+        #         mystring = "".join(tokens[i1:])
+        #         if sentence_tf not in mystring:
+        #             break
+        #     i1 = i1 - 1
+        #     for i2 in xarr[::-1]:
+        #         mystring = "".join(tokens[i1:i2 + 1])
+        #         if sentence_tf not in mystring:
+        #             break
+        #     i2 = i2 + 1
+        #
+        #     sentence_len = i2 - i1 + 1
+        #     sentence_end = start_idx + sentence_len - 1
+        #     hidden_state = hidden_states[start_idx:sentence_end+1, :]
+        #     combined_hidden_states[sent_i] = hidden_state.detach().cpu().numpy().tolist()
+        #     combined_token_logprobs[sent_i] = token_logprobs[i1:i2+1]
+        #     combined_token_entropies[sent_i] = token_entropies[i1:i2+1]
+        #     sentences_end.append(sentence_end)
+        #     record.append([start_idx, sentence_end])
+        #     start_idx = sentence_end + 1
 
         outputs = {
             "tokens": tokens,
             "token_logprobs": token_logprobs,
             "token_entropies": token_entropies,
             "tokens_idx": tokens_idx,
-            "ques_hidden_states": ques_hidden_states,
-            "res_hidden_states": res_hidden_states,
+            # "ques_hidden_states": ques_hidden_states.detach().cpu().numpy().tolist(),
+            # "res_hidden_states": res_hidden_states.detach().cpu().numpy().tolist(),
+            "combined_hidden_states": combined_hidden_states,
+            "combined_token_logprobs": combined_token_logprobs,
+            "combined_token_entropies": combined_token_entropies,
             "token_and_logprobs": token_and_logprobs
         }
+
+        conv.messages[-1][1] = ""
 
         return outputs
 

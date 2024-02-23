@@ -2,7 +2,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import pickle
 
-path = f"data/answer_synthetic_data_from_M_HalDetect.bin"
+path = f"result/answer_synthetic_val_data_from_M_HalDetect.bin"
 with open(path, "rb") as f:
     responses = pickle.load(f)
 
