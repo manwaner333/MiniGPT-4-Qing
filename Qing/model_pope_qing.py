@@ -45,16 +45,15 @@ def main(args):
     answers_file = os.path.expanduser(args.answers_file)
     os.makedirs(os.path.dirname(answers_file), exist_ok=True)
     responses = {}
-    # idxs = ['COCO_val2014_000000193245', 'COCO_val2014_000000086848']
     count = 0
     for line in tqdm(questions):
 
-        # if count == 195:
-        #     break
+        if count >= 100:
+            break
 
         idx = line["question_id"]
 
-        # if idx != 194:  # 194
+        # if idx != 194:
         #     continue
 
         # Set Chat
@@ -72,8 +71,6 @@ def main(args):
         user_message = question + "<QuestoRes>" + response
         chat.ask(user_message, chat_state)
         chat.encode_img(img_list)
-        # print("chat_state")
-        # print(chat_state)
 
         # get answer
         # logprobs = chat.answer(conv=chat_state,
@@ -94,7 +91,8 @@ def main(args):
         logprobs = chat.answer(conv=chat_state,
                                img_list=img_list,
                                sentences=sentences,
-                               output_hidden_states=True)
+                               output_hidden_states=True,
+                               output_attentions=True)
 
         output = {"question_id": idx,
                   "image_file": image_file,

@@ -103,16 +103,10 @@ def extract_info_from_answers(file_path, use_tfidf_weight=False, use_attention_w
         combined_token_logprobs = log_probs["combined_token_logprobs"]
         combined_token_entropies = log_probs["combined_token_entropies"]
         labels = response["labels"]
-
-        assert len(combined_token_logprobs) == len(combined_token_entropies) == len(labels) == len(response["sentences"]), "Unmatched numbers sentences."
-
         sentences_len = len(response["sentences"])
         tokens = response['logprobs']['tokens']
         attentions = response['logprobs']['combined_attentions']
 
-
-        if sentences_len == 0 or len(labels) == 0 or not detect_hidden_states(log_probs['combined_hidden_states']):
-            continue
 
         average_logprob_sent_level = [None for _ in range(sentences_len)]  # [None for _ in range(sentences_len)]
         lowest_logprob_sent_level = [None for _ in range(sentences_len)]
@@ -131,7 +125,7 @@ def extract_info_from_answers(file_path, use_tfidf_weight=False, use_attention_w
 
         for i in range(sentences_len):
             sentence = response["sentences"][i]
-            sentence_log_probs = [item[0] for item in combined_token_logprobs[i]]  # combined_token_logprobs[i]
+            sentence_log_probs = [item for item in combined_token_logprobs[i]]  # combined_token_logprobs[i]
             sentence_entropies = combined_token_entropies[i]
             label = labels[i]
 
@@ -299,7 +293,7 @@ def analysis_sentence_level_info(average_logprob_scores, average_entropy_scores,
     print("Baseline2: Avg(H)")
     print_AUC(Pb_average_entropy, Rb_average_entropy)
     print("-----------------------")
-    print("Baseline3: Max(-logP)")
+    print("Baseline3: Max(logP)")
     print_AUC(Pb_lowest_logprob, Rb_lowest_logprob)
     print("-----------------------")
     print("Baseline4: Max(H)")
@@ -358,26 +352,25 @@ def analysis_response_level_info(logprob_response_scores, entropy_response_score
 
 if __name__ == "__main__":
 
-
-    path = f"result/answer_synthetic_val_data_from_M_HalDetect_modified_llava_15_7b.bin"
+    path = f"result/answer_gqa_testdev_balanced_questions_yes_no.bin"
     (average_logprob_scores, lowest_logprob_scores, average_entropy_scores, highest_entropy_scores, human_label_detect_True
      , human_label_detect_False, sentences_info, images_info, sentences_idx_info, token_and_logprobs_info, labels_info, idx_info
      , logprob_response_scores, entropy_response_scores, label_True_response, label_False_response, tfidf_weight_scores, attention_weight_scores) = extract_info_from_answers(path)
 
     df = form_dataframe_from_extract_info(average_logprob_scores, lowest_logprob_scores, average_entropy_scores, highest_entropy_scores, sentences_info, images_info, sentences_idx_info, token_and_logprobs_info, labels_info, idx_info, tfidf_weight_scores, attention_weight_scores)
 
-    df.to_csv("result/m_hal_df.csv")
+    df.to_csv("result/gqa_df.csv")
 
 
     # 分析准确率
-    # true_values = []
-    # for key, value in human_label_detect_True.items():
-    #     true_values.extend(value)
-    # total_num = len(true_values)
-    # print("The total number of sentences is: {}; The ratio of true values is: {}".format(total_num, true_values.count(1.0) / total_num))
+    true_values = []
+    for key, value in human_label_detect_True.items():
+        true_values.extend(value)
+    total_num = len(true_values)
+    print("The total number of sentences is: {}; The ratio of true values is: {}".format(total_num, true_values.count(1.0) / total_num))
 
 
-    # 分析sentence level的相关数据
+    # # 分析sentence level的相关数据
     analysis_sentence_level_info(average_logprob_scores, average_entropy_scores, lowest_logprob_scores,
                                  highest_entropy_scores, human_label_detect_True)
 

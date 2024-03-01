@@ -156,7 +156,7 @@ class Chat:
         else:
             conv.append_message(conv.roles[0], text)
 
-    def answer_prepare(self, conv, img_list, max_new_tokens=300, max_length=2000, output_hidden_states=True):
+    def answer_prepare(self, conv, img_list, max_new_tokens=300, max_length=2000, output_hidden_states=True, output_attentions=True):
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
         embs, seg_tokens = self.model.get_context_emb(prompt, img_list)
@@ -170,7 +170,8 @@ class Chat:
 
         generation_kwargs = dict(
             inputs_embeds=embs,
-            output_hidden_states=output_hidden_states,)
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions)
 
         return generation_kwargs, seg_tokens
 
@@ -191,22 +192,20 @@ class Chat:
 
         outputs = self.model_generate(**generation_dict)
 
-        #hidden states
+        # hidden states
         hidden_states = outputs['hidden_states'][32][0]
         ques_hidden_states = hidden_states[ques_start_idx:ques_end_idx + 1, :]
         res_hidden_states = hidden_states[res_start_idx:res_end_idx + 1, :]
 
-        #logit
+        # logit
         logits = outputs['logits']
 
-        # Shift the logits and input_ids by one position so that we align the logits with their respective tokens
-        # start_index = seg_tokens_1_len + img_len + 3
-        # shifted_logits = logits[:, start_index: (-1-4), :]
-        # shifted_input_ids = seg_tokens[:, 3 + 1:-5]
+        # attention
+        attentions = outputs['attentions']
 
         shifted_logits = logits[:, ques_start_idx:res_end_idx, :]
         shifted_input_ids = torch.cat((seg_tokens[0], seg_tokens[1], seg_tokens[2]), 1)[:, ques_start_idx - img_len + 1:res_end_idx - img_len + 1]
-        # shifted_input_ids = torch.cat((seg_tokens[1][:, 3 + 1:], seg_tokens[2][:, :-4]), 1)
+
 
         # Convert logits to probabilities
         log_probs = torch.nn.functional.log_softmax(shifted_logits, dim=-1)
@@ -236,16 +235,20 @@ class Chat:
             tokens_idx.append(gen_tok_id.detach().cpu().numpy().tolist())
 
         # 提取每个句子最后一个token的hidden state
+        combined_attentions = {}
         combined_hidden_states = {}
         combined_token_logprobs = {}
         combined_token_entropies = {}
         ques_hidden_states = hidden_states[ques_end_idx:ques_end_idx + 1, :]
         combined_hidden_states["ques"] = ques_hidden_states.detach().cpu().numpy().tolist()
+        combined_attentions['ques'] = attentions[31][0, :, ques_start_idx:ques_end_idx + 1, ques_start_idx:ques_end_idx + 1].detach().cpu().numpy().tolist()
+
 
         sentences_end = []
         sentences_end.append(ques_end_idx)
         start_idx = res_start_idx
         record = []
+        record1 = []
         for sent_i, sentence in enumerate(sentences):
             # sentence exist in the passage, so we need to find where it is [i1, i2]
             sentence_tf = "".join(sentence.split(" "))
@@ -264,11 +267,14 @@ class Chat:
             sentence_len = i2 - i1 + 1
             sentence_end = start_idx + sentence_len - 1
             hidden_state = hidden_states[sentence_end:sentence_end+1, :]
+            attention = attentions[31][0, :, start_idx:sentence_end + 1, start_idx:sentence_end + 1].detach().cpu().numpy().tolist()
             combined_hidden_states[sent_i] = hidden_state.detach().cpu().numpy().tolist()
             combined_token_logprobs[sent_i] = token_logprobs[i1:i2+1]
             combined_token_entropies[sent_i] = token_entropies[i1:i2+1]
+            combined_attentions[sent_i] = attention
             sentences_end.append(sentence_end)
             record.append([i1, i2])
+            record1.append([start_idx, sentence_end])
             start_idx = sentence_end + 1
 
         # 提取每个句子每一个token的hidden state
@@ -317,6 +323,7 @@ class Chat:
             "combined_hidden_states": combined_hidden_states,
             "combined_token_logprobs": combined_token_logprobs,
             "combined_token_entropies": combined_token_entropies,
+            "combined_attentions": combined_attentions,
             "token_and_logprobs": token_and_logprobs
         }
 
